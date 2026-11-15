@@ -11,22 +11,12 @@ workflows:
           unzip -o 3105-interface-customizada.zip -d unzipped_project || true
           
           PROJECT_PATH=$(find unzipped_project -name "*.xcodeproj" -type d | head -n 1)
-          
-          if [ -z "$PROJECT_PATH" ]; then
-            echo "ERRO: O arquivo .xcodeproj nao foi encontrado!"
-            exit 1
-          fi
-          
           PROJECT_DIR=$(dirname "$PROJECT_PATH")
-          PROJECT_NAME=$(basename "$PROJECT_PATH" .xcodeproj)
           
           cd "$PROJECT_DIR"
           
-          echo "--- Listando os esquemas do projeto ---"
-          xcodebuild -list -project "$PROJECT_NAME.xcodeproj"
-          
-          echo "--- Iniciando Build ---"
-          xcodebuild -project "$PROJECT_NAME.xcodeproj" -scheme "$PROJECT_NAME" -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' archive -archivePath $CM_BUILD_DIR/build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO || exit 1
+          # Usando o nome exato do esquema (Scheme) que o Xcode encontrou: 3105
+          xcodebuild -project "ThreeOneOSFive.xcodeproj" -scheme "3105" -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' archive -archivePath $CM_BUILD_DIR/build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO || exit 1
           
           mkdir -p $CM_BUILD_DIR/build/Payload
           cp -r $CM_BUILD_DIR/build/App.xcarchive/Products/Applications/*.app $CM_BUILD_DIR/build/Payload/
