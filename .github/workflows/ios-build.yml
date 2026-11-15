@@ -1,0 +1,39 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: 
+
+jobs:
+  build:
+    name: Build and Export IPA
+    runs-on: macos-14 
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Unzip Project
+        run: |
+          unzip 3105-interface-customizada.zip -d unzipped_project
+          ls -R unzipped_project
+
+      - name: Set up Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Build and Archive
+        run: |
+          xcodebuild -project unzipped_project/3105-interface-customizada/ThreeOneOSFive.xcodeproj -scheme "ThreeOneOSFive" -sdk iphoneos -configuration Release archive -archivePath $PWD/build/App.xcarchive CODE_SIGNING_ALLOWED=NO
+
+      - name: Export Unsigned IPA
+        run: |
+          mkdir -p $PWD/build/Payload
+          cp -r $PWD/build/App.xcarchive/Products/Applications/*.app $PWD/build/Payload/
+          cd $PWD/build
+          zip -r App-unsigned.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: $PWD/build/App-unsigned.ipa
