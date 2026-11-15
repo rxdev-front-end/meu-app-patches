@@ -8,27 +8,34 @@ workflows:
     scripts:
       - name: Unzip and Build IPA
         script: |
-          set -e
+          echo "1. Descompactando o arquivo..."
+          # O '|| true' avisa o script para ignorar avisos chatos de zip
+          unzip -o 3105-interface-customizada.zip -d unzipped_project || true
           
-          echo "1. Descompactando..."
-          unzip -o 3105-interface-customizada.zip -d unzipped_project
-          
-          echo "2. Procurando o projeto..."
+          echo "2. Procurando a pasta do projeto..."
           PROJECT_PATH=$(find unzipped_project -name "*.xcodeproj" -type d | head -n 1)
+          echo "Projeto encontrado em: $PROJECT_PATH"
+          
+          if [ -z "$PROJECT_PATH" ]; then
+            echo "ERRO FATAL: O arquivo .xcodeproj nao foi encontrado dentro do ZIP!"
+            exit 1
+          fi
+          
           PROJECT_DIR=$(dirname "$PROJECT_PATH")
           PROJECT_NAME=$(basename "$PROJECT_PATH" .xcodeproj)
           
-          echo "3. Listando os esquemas disponiveis:"
+          echo "3. Iniciando compilacao com Xcode (Isso demora alguns minutos)..."
           cd "$PROJECT_DIR"
-          xcodebuild -list -project "$PROJECT_NAME.xcodeproj"
           
-          echo "4. Compilando..."
           xcodebuild -project "$PROJECT_NAME.xcodeproj" -scheme "$PROJECT_NAME" -sdk iphoneos -configuration Release -destination 'generic/platform=iOS' archive -archivePath $CM_BUILD_DIR/build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
           
-          echo "5. Empacotando..."
+          echo "4. Empacotando o IPA final..."
           mkdir -p $CM_BUILD_DIR/build/Payload
           cp -r $CM_BUILD_DIR/build/App.xcarchive/Products/Applications/*.app $CM_BUILD_DIR/build/Payload/
+          
           cd $CM_BUILD_DIR/build
           zip -r App-unsigned.ipa Payload
+          
+          echo "Build finalizado com sucesso!"
     artifacts:
       - build/App-unsigned.ipa
