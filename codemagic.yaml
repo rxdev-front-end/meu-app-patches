@@ -6,13 +6,23 @@ workflows:
     environment:
       xcode: latest
     scripts:
-      - name: Unzip Project
+      - name: Unzip and Find Project
         script: |
           unzip 3105-interface-customizada.zip -d unzipped_project
+          ls -R unzipped_project
+          PROJECT_PATH=$(find unzipped_project -name "*.xcodeproj" | head -n 1)
+          echo "Found project at: $PROJECT_PATH"
+          echo "PROJECT_PATH=$PROJECT_PATH" >> $CM_ENV
       - name: Build and Export IPA
         script: |
-          cd unzipped_project/3105-interface-customizada
-          xcodebuild -project ThreeOneOSFive.xcodeproj -scheme "ThreeOneOSFive" -sdk iphoneos -configuration Release archive -archivePath $CM_BUILD_DIR/build/App.xcarchive CODE_SIGNING_ALLOWED=NO
+          PROJECT_DIR=$(dirname "$PROJECT_PATH")
+          PROJECT_NAME=$(basename "$PROJECT_PATH" .xcodeproj)
+          
+          echo "Building project: $PROJECT_NAME in $PROJECT_DIR"
+          cd "$PROJECT_DIR"
+          
+          xcodebuild -project "$PROJECT_NAME.xcodeproj" -scheme "$PROJECT_NAME" -sdk iphoneos -configuration Release archive -archivePath $CM_BUILD_DIR/build/App.xcarchive CODE_SIGNING_ALLOWED=NO
+          
           mkdir -p $CM_BUILD_DIR/build/Payload
           cp -r $CM_BUILD_DIR/build/App.xcarchive/Products/Applications/*.app $CM_BUILD_DIR/build/Payload/
           cd $CM_BUILD_DIR/build
