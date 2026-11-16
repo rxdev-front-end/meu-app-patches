@@ -1,5 +1,5 @@
 workflows:
-  lucchese-ios-unsigned:
+  ios-workflow:
     name: Lucchese Store 3106 - unsigned IPA
     max_build_duration: 120
     instance_type: mac_mini_m2
