@@ -1,0 +1,56 @@
+workflows:
+  lucchese-ios-unsigned:
+    name: Lucchese Store 3106 - unsigned IPA
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+      vars:
+        XCODE_PROJECT: ThreeOneOSSix.xcodeproj
+        XCODE_SCHEME: "3106"
+    scripts:
+      - name: Verify Xcode project and shared scheme
+        script: |
+          set -euo pipefail
+          test -d "$CM_BUILD_DIR/$XCODE_PROJECT"
+          xcodebuild -list -project "$CM_BUILD_DIR/$XCODE_PROJECT"
+          xcodebuild -showBuildSettings \
+            -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release >/dev/null
+      - name: Archive for generic iOS device without signing
+        script: |
+          set -euo pipefail
+          ARCHIVE_DIR="$CM_BUILD_DIR/build/ios/xcarchive"
+          ARCHIVE_PATH="$ARCHIVE_DIR/LuccheseStore.xcarchive"
+          DERIVED_DATA="$CM_BUILD_DIR/build/ios/DerivedData"
+          mkdir -p "$ARCHIVE_DIR" "$DERIVED_DATA"
+          xcodebuild \
+            -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphoneos \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            archive
+      - name: Package unsigned IPA artifact
+        script: |
+          set -euo pipefail
+          ARCHIVE_PATH="$CM_BUILD_DIR/build/ios/xcarchive/LuccheseStore.xcarchive"
+          APP_PATH="$ARCHIVE_PATH/Products/Applications/3106.app"
+          PACKAGE_DIR="$CM_BUILD_DIR/build/ios/package"
+          IPA_DIR="$CM_BUILD_DIR/build/ios/ipa"
+          test -d "$APP_PATH"
+          rm -rf "$PACKAGE_DIR"
+          mkdir -p "$PACKAGE_DIR/Payload" "$IPA_DIR"
+          ditto "$APP_PATH" "$PACKAGE_DIR/Payload/3106.app"
+          rm -f "$IPA_DIR/LuccheseStore-unsigned.ipa"
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$PACKAGE_DIR/Payload" "$IPA_DIR/LuccheseStore-unsigned.ipa"
+          /usr/bin/unzip -t "$IPA_DIR/LuccheseStore-unsigned.ipa"
+          /usr/bin/unzip -Z1 "$IPA_DIR/LuccheseStore-unsigned.ipa" | grep -q '^Payload/3106.app/Info.plist$'
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
