@@ -148,16 +148,7 @@ jobs:
           shasum -a 256 "$IPA"
           echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
 
-      - name: Upload unsigned IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: LuccheseStore-3106-unsigned-ipa-${{ github.run_number }}
-          path: ${{ env.IPA_PATH }}
-          if-no-files-found: error
-          retention-days: 14
-
       - name: Publish original IPA as GitHub Release asset
-        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
