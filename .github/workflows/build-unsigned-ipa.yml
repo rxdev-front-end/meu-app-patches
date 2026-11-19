@@ -138,13 +138,24 @@ jobs:
 
           rm -rf "$PACKAGE_DIR" "$IPA"
           mkdir -p "$PACKAGE_DIR/Payload"
-          ditto "$APP" "$PACKAGE_DIR/Payload/3106.app"
-          ditto -c -k --sequesterRsrc --keepParent \
-            "$PACKAGE_DIR/Payload" \
-            "$IPA"
+          cp -R "$APP" "$PACKAGE_DIR/Payload/3106.app"
+
+          # Create the archive from the directory containing Payload. This
+          # guarantees Payload/3106.app at the archive root, without an extra
+          # Payload/Payload or lucchese-package/Payload directory level.
+          (
+            cd "$PACKAGE_DIR"
+            /usr/bin/zip -qry "$IPA" Payload
+          )
 
           unzip -tq "$IPA"
-          unzip -Z1 "$IPA" | grep -q '^Payload/3106.app/Info.plist$'
+          echo "IPA contents:"
+          unzip -Z1 "$IPA" | sed -n '1,30p'
+          unzip -Z1 "$IPA" | grep -q '^Payload/[^/][^/]*/Info.plist$'
+          if unzip -Z1 "$IPA" | grep -q '^Payload/Payload/'; then
+            echo "ERROR: IPA contains an extra Payload directory level" >&2
+            exit 1
+          fi
           shasum -a 256 "$IPA"
           echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
 
