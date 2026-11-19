@@ -59,6 +59,29 @@ jobs:
           echo "PROJECT_PATH=$PROJECT_PATH" >> "$GITHUB_ENV"
           echo "Fonte extraída em: $SOURCE_ROOT"
 
+      - name: Apply SDK compatibility fallback
+        run: |
+          set -euo pipefail
+          CONTENT_VIEW="$SOURCE_ROOT/ThreeOneOSSix/ContentView.swift"
+          if [ ! -f "$CONTENT_VIEW" ]; then
+            echo "ERROR: ContentView.swift não foi encontrado em $SOURCE_ROOT" >&2
+            exit 1
+          fi
+
+          python3 - "$CONTENT_VIEW" <<'PY'
+          import pathlib
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text(encoding="utf-8")
+          old = "content.background { shape.fill(.clear).glassEffect(.regular, in: shape) }"
+          new = "content.background(shape.fill(fallback))"
+          if old not in text:
+              raise SystemExit("glassEffect compatibility target was not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          print("Applied Xcode 16-compatible glass surface fallback")
+          PY
+
       - name: Show Xcode and project
         run: |
           set -euo pipefail
