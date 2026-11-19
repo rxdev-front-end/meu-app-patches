@@ -1,0 +1,100 @@
+name: Build unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 3106
+      - main
+  pull_request:
+    branches:
+      - 3106
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unsigned-ipa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and package unsigned IPA
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Show build environment
+        run: |
+          set -euo pipefail
+          sw_vers
+          xcode-select -p
+          xcodebuild -version
+          xcodebuild -list -project ThreeOneOSSix.xcodeproj
+
+      - name: Run repository policy tests
+        run: bash Tests/run_policy_tests.sh
+
+      - name: Build unsigned iOS app
+        env:
+          DERIVED_DATA: ${{ runner.temp }}/ThreeOneOSSix-DerivedData
+        run: |
+          set -euo pipefail
+          rm -rf "$DERIVED_DATA"
+          xcodebuild \
+            -project ThreeOneOSSix.xcodeproj \
+            -scheme 3106 \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            build
+
+      - name: Package unsigned IPA
+        env:
+          DERIVED_DATA: ${{ runner.temp }}/ThreeOneOSSix-DerivedData
+          PACKAGE_DIR: ${{ runner.temp }}/ThreeOneOSSix-Package
+        run: |
+          set -euo pipefail
+          APP="$DERIVED_DATA/Build/Products/Release-iphoneos/3106.app"
+          test -d "$APP" || {
+            echo "ERROR: built app was not found at $APP" >&2
+            find "$DERIVED_DATA" -maxdepth 6 -type d -name '*.app' -print || true
+            exit 1
+          }
+
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          IPA="$RUNNER_TEMP/3106-${VERSION}-${BUILD}-unsigned.ipa"
+
+          rm -rf "$PACKAGE_DIR" "$IPA"
+          mkdir -p "$PACKAGE_DIR/Payload"
+          ditto "$APP" "$PACKAGE_DIR/Payload/3106.app"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$PACKAGE_DIR/Payload" \
+            "$IPA"
+
+          unzip -tq "$IPA"
+          unzip -Z1 "$IPA" | grep -q '^Payload/3106.app/Info.plist$'
+          shasum -a 256 "$IPA"
+          echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
+          echo "IPA_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "IPA_BUILD=$BUILD" >> "$GITHUB_ENV"
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3106-unsigned-ipa-${{ github.run_number }}
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: error
+          retention-days: 14
