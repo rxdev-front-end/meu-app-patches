@@ -8,7 +8,7 @@ on:
       - 3106
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: unsigned-ipa-${{ github.ref }}
@@ -155,3 +155,15 @@ jobs:
           path: ${{ env.IPA_PATH }}
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish original IPA as GitHub Release asset
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="unsigned-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" "$IPA_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "LuccheseStore 3106 unsigned IPA #${GITHUB_RUN_NUMBER}" \
+            --notes "Unsigned IPA generated from LuccheseStore-3106-CodeMagic.zip."
